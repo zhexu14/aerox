@@ -1,20 +1,31 @@
+import matplotlib.pyplot as plt
+import numpy as np
+
 
 class Aerofoil:
 
-    def __init__(self):
+    def __init__( self ):
         self.coordinates = []
         self.top = []
         self.bottom = []
         self.leading_edge = None
         self.trailing_edge = None
 
-    def load_from_gnu(self, file):
+    def load_from_gnu( self, file ):
+        """
+        Load aerofoil from gnu format output
+        :param file: file-like object to read from
+        :return: None
+        """
         top = []
         bottom = []
         points = top
         for line in file:
             line = line.rstrip( '\n' )
-            s = line.split( ',' )
+            line = line[ 3: ]
+            s = line.split( ' ' )
+            if len( s ) > 2:
+                s = [ s[ 0 ], s[ -1 ] ]
             if len( s ) < 2:
                 points = bottom
                 continue
@@ -26,3 +37,7 @@ class Aerofoil:
         self.bottom = bottom[ 1: -1 ]
         self.leading_edge = top[ 0 ]
         self.trailing_edge = top[ -1 ]
+
+    def plot( self ):
+        c = np.array(  self.coordinates )
+        plt.plot( c[ :, 0 ], c[ :, 1 ] )
