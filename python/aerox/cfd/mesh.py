@@ -159,10 +159,10 @@ def _leading_edge( top, bottom, config ):
         return Point( tuple( -s ) )
 
     center_point = circle_center( top[ 'points' ][ 'aerofoil' ], bottom[ 'points' ][ 'aerofoil' ] )
-    inner = Circle(begin = top[ 'points' ][ 'aerofoil' ][0].id,
-                             center = center_point.id,
-                             end = bottom[ 'points' ][ 'aerofoil' ][-1].id,
-                             transfinite = config[ 'boundary_layer' ][ 'leading_edge_discretisation' ] )
+
+    inner = Line( begin = top[ 'points' ][ 'aerofoil' ][0],
+                  end = bottom[ 'points' ][ 'aerofoil' ][-1],
+                  transfinite = config[ 'boundary_layer' ][ 'leading_edge_discretisation' ] )
     outer = Circle(begin = top[ 'points' ][ 'boundary_layer' ][0].id,
                              center = center_point.id,
                              end = bottom[ 'points' ][ 'boundary_layer' ][-1].id,
@@ -187,27 +187,81 @@ def _trailing_edge( top, bottom, config ):
     :param config:
     :return:
     """
+
+    def rectangle( top_left, bottom_left, left_line, vertical_discretisation, horizontal_discretisation ):
+        """
+
+        :param top_left: top left point
+        :param bottom_left: bottom left point
+        :param left_line: left line
+        :param vertical_discretisation: vertical discretisation
+        :param horizontal_discretisation: horizontal discretisation
+        :return:
+        """
+        top_right = Point( ( config[ 'far_field' ][ 'size' ] - 0.5,
+                             top_left.coordinates[ 1 ],
+                             0 ) )
+        bottom_right = Point( ( config[ 'far_field' ][ 'size' ] - 0.5,
+                                bottom_left.coordinates[1],
+                                0 ) )
+
+        top_line = Line( top_left,
+                         top_right,
+                         transfinite = horizontal_discretisation )
+        bottom_line = Line( bottom_right,
+                            bottom_left,
+                            transfinite = horizontal_discretisation )
+        right_line = Line( top_right,
+                           bottom_right,
+                           transfinite = vertical_discretisation )
+
+        loop = Loop( [ left_line.id,
+                       top_line.id,
+                       right_line.id,
+                       bottom_line.id ] )
+
+        surface = Surface( [ loop.id ], transfinite = True )
+
+        return { 'points': { 'all': [ top_right, bottom_right ] },
+                 'curves': { 'all': [ top_line, right_line, bottom_line ] },
+                 'loops': { 'all': [ loop ] },
+                 'surfaces': { 'all': [ surface ] } }
+
     te_line = Line( top[ 'points' ][ 'aerofoil' ][-1],
                     bottom[ 'points' ][ 'aerofoil' ][0],
-                    transfinite = config[ 'boundary_layer' ][ 'trailing_edge_discretisation' ] )
-    center_point = Point( ( top[ 'points' ][ 'aerofoil' ][ - 1].coordinates[0],
-                             0,
-                             0 ) )
-    circle = Circle( begin = top[ 'points' ][ 'boundary_layer' ][ -1 ].id,
-                     center = center_point.id,
-                     end = bottom[ 'points' ][ 'boundary_layer' ][ 0 ].id,
-                     transfinite = config[ 'boundary_layer' ][ 'trailing_edge_discretisation' ] )
-    loop = Loop( [ top[ 'curves' ][ 'normals' ][-1].id,
-                    circle.id,
-                    - bottom[ 'curves' ][ 'normals' ][0].id,
-                    - te_line.id ] )
-    surface = Surface([loop.id], transfinite = True)
+                    transfinite = 2 )
 
-    return { 'points': { 'center': [ center_point ] },
-             'curves': { 'trailing_edge': [ te_line ],
-                          'circle': [ circle ] },
-             'loops': { 'all': [ loop ] },
-             'surfaces': { 'all': [ surface ] } }
+    top_rectangle = rectangle( top_left = top[ 'points' ][ 'boundary_layer' ][ -1 ],
+                               bottom_left = top[ 'points' ][ 'aerofoil' ][ -1 ],
+                               left_line = top[ 'curves' ][ 'normals' ][ -1 ],
+                               vertical_discretisation = config[ 'boundary_layer' ][ 'layers' ],
+                               horizontal_discretisation = config[ 'boundary_layer' ][ 'trailing_edge_discretisation' ] )
+
+    bottom_rectangle = rectangle( top_left = bottom[ 'points' ][ 'boundary_layer' ][ 0 ],
+                                  bottom_left = bottom[ 'points' ][ 'aerofoil' ][ 0 ],
+                                  left_line = bottom[ 'curves' ][ 'normals' ][ 0 ],
+                                  vertical_discretisation = config[ 'boundary_layer' ][ 'layers' ],
+                                  horizontal_discretisation = config[ 'boundary_layer' ][ 'trailing_edge_discretisation' ] )
+
+
+    center_right_line = Line( top_rectangle[ 'points' ][ 'all' ][ 1 ],
+                              bottom_rectangle[ 'points' ][ 'all' ][ 1 ],
+                              transfinite = 2 )
+    center_loop = Loop( [ te_line.id,
+                          top_rectangle[ 'curves' ][ 'all' ][ 2 ].id,
+                          - center_right_line.id,
+                          - bottom_rectangle[ 'curves' ][ 'all' ][ 2 ].id ] )
+    center_surface = Surface( [ center_loop.id ], transfinite = True )
+
+    r = top_rectangle
+    for key in [ 'points', 'curves', 'loops', 'surfaces' ]:
+        r[ key ][ 'all' ] += bottom_rectangle[ key ][ 'all' ]
+    r[ 'curves' ][ 'trailing_edge' ] = [ te_line ]
+    r[ 'curves' ][ 'all' ] += [ center_right_line ]
+    r[ 'loops' ][ 'all' ] += [ center_loop ]
+    r[ 'surfaces' ][ 'all' ] += [ center_surface ]
+
+    return r
 
 def _far_field( config ):
     """
