@@ -16,6 +16,7 @@ def default_config():
     Far field
     - far_field/size: half-dimensions of the far field. The far field is a square at +/- this size from the leading
                       edge of the aerofoil.
+    - far_field/discretisation: grid size at far field
 
     Boundary layer
     - boundary_layer/thickness: boundary layer thickness.
@@ -28,16 +29,20 @@ def default_config():
                                              |_|_|_|_|_|_|
                                              |_|_|_|_|_|_|
                                              Segment of aerofoil surface
+    - boundary_layer/progression: progression in the thickness of the layers. 1 is uniform thickness, >1 means layers
+                                  become thicker the farther away they are from the aerofoil.
     - boundary_layer/leading_edge_discretisation: the number of regular radial cells to use when meshing along the
                                                   leading edge surface.
     - boundary_layer/trailing_edge_discretisation: the number of regular cells to model the wake with.
     :return: default config as dict.
     """
-    return {'far_field': {'size': 5.2},
-            'boundary_layer': {'thickness': 0.2,
-                               'layers': 40,
+    return {'far_field': {'size': 10,
+                          'discretisation': 0.5},
+            'boundary_layer': {'thickness': 9,
+                               'layers': 80,
+                               'progression': 1.1,
                                'leading_edge_discretisation': 4,
-                               'trailing_edge_discretisation': 200,
+                               'trailing_edge_discretisation': 100,
                                'discretisation': 2}}
 
 
@@ -150,19 +155,23 @@ def _half_aerofoil(coordinates, config):
 
     aerofoil_lines = []
     boundary_lines = []
-    vertical_lines = [Line(aerofoil_points[0], boundary_points[0], transfinite = config['boundary_layer']['layers'])]
+    vertical_lines = [Line(aerofoil_points[0],
+                           boundary_points[0],
+                           transfinite = config['boundary_layer']['layers'],
+                           progression = config['boundary_layer']['progression'])]
     loops = []
     surfaces = []
     for i in range(1, len(aerofoil_points)):
         aerofoil_line = Line(aerofoil_points[i-1],
                              aerofoil_points[i],
-                             transfinite = config['boundary_layer']['discretisation'])
+                             transfinite = config['boundary_layer']['discretisation'],)
         boundary_line = Line(boundary_points[i],
                              boundary_points[i - 1],
                              transfinite = config['boundary_layer']['discretisation'])
         vertical_line = Line(aerofoil_points[i],
                              boundary_points[i],
-                             transfinite = config['boundary_layer']['layers'])
+                             transfinite = config['boundary_layer']['layers'],
+                             progression = config['boundary_layer']['progression'])
         aerofoil_lines.append(aerofoil_line)
         boundary_lines.append(boundary_line)
         vertical_lines.append(vertical_line)
@@ -254,13 +263,14 @@ def _trailing_edge(top, bottom, config):
         bottom_line = Line(bottom_right,
                            bottom_left,
                            transfinite = horizontal_discretisation)
-        right_line = Line(top_right,
-                          bottom_right,
-                          transfinite = vertical_discretisation)
+        right_line = Line(bottom_right,
+                          top_right,
+                          transfinite = vertical_discretisation,
+                          progression = config['boundary_layer']['progression'])
 
         loop = Loop([left_line.id,
                      top_line.id,
-                     right_line.id,
+                     -right_line.id,
                      bottom_line.id])
 
         surface = Surface([loop.id], transfinite = True)
@@ -269,7 +279,7 @@ def _trailing_edge(top, bottom, config):
                 'curves': {'all': [top_line, right_line, bottom_line]},
                 'loops': {'all': [loop]},
                 'surfaces': {'all': [surface]}}
-    
+
     te_line = Line(top['points']['aerofoil'][-1],
                    bottom['points']['aerofoil'][0],
                    transfinite = 2)
@@ -315,10 +325,10 @@ def _far_field(config):
     """
     def _points(config):
         v = config['far_field']['size']
-        return [Point((-v, -v, 0), 0.1),
-                Point((-v, v, 0), 0.1),
-                Point((v, v, 0), 0.1),
-                Point((v, -v, 0), 0.1)]
+        return [Point((-v, -v, 0), config['far_field']['discretisation']),
+                Point((-v, v, 0), config['far_field']['discretisation']),
+                Point((v, v, 0), config['far_field']['discretisation']),
+                Point((v, -v, 0), config['far_field']['discretisation'])]
 
     def _lines(points, closed = True, transfinite = None):
         """
