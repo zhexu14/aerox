@@ -55,10 +55,11 @@ def run(config, verbose = False):
         os.rename('history.dat', 'history_{}.dat'.format(alpha))
 
         if verbose:
-            sys.stderr.write('{},{},{},{}'.format(alpha,
-                                                  coefficients[-1]['lift'],
-                                                  coefficients[-1]['drag'],
-                                                  coefficients[-1]['pitching_moment']))
+            sys.stderr.write('{},{},{},{}\n'.format(alpha,
+                                                    coefficients[-1]['lift'],
+                                                    coefficients[-1]['drag'],
+                                                    coefficients[-1]['pitching_moment']))
+            sys.stderr.flush()
     return coefficients
 
 
