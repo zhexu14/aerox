@@ -39,22 +39,24 @@ class Curve:
     _next_id = 1
 
 
-class Line( Curve ):
+class Line(Curve):
     """
     Lines
     """
 
-    def __init__( self, begin, end, transfinite = None ):
+    def __init__(self, begin, end, transfinite = None, progression = 1):
         super( Line, self ).__init__()
         self.begin = begin
         self.end = end
         self.transfinite = transfinite
+        self.progression =  progression
 
     def __str__( self ):
         transfinite_statement = ''
         if self.transfinite is not None:
-            transfinite_statement = 'Transfinite Line {{ {id} }} = {n} Using Progression 1;'.format( id = self.id,
-                                                                                                     n = self.transfinite )
+            transfinite_statement = 'Transfinite Line {{ {id} }} = {n} Using Progression {p};'.format(id = self.id,
+                                                                                                      n = self.transfinite,
+                                                                                                      p = self.progression)
         return 'Line( {id} ) = {{ {begin}, {end} }}; {transfinite}'.format( id = self.id,
                                                                             begin = self.begin.id,
                                                                             end = self.end.id,
@@ -66,18 +68,20 @@ class Circle( Curve ):
     Circle arc
     """
 
-    def __init__( self, center, begin, end, transfinite = None ):
+    def __init__( self, center, begin, end, transfinite = None, progression = 1 ):
         super( Circle, self ).__init__()
         self.center = center
         self.begin = begin
         self.end = end
         self.transfinite = transfinite
+        self.progression = progression
 
     def __str__( self ):
         transfinite_statement = ''
         if self.transfinite is not None:
-            transfinite_statement = 'Transfinite Line {{ {id} }} = {n} Using Progression 1;'.format( id = self.id,
-                                                                                                     n = self.transfinite )
+            transfinite_statement = 'Transfinite Line {{ {id} }} = {n} Using Progression {p};'.format(id = self.id,
+                                                                                                      n = self.transfinite,
+                                                                                                      p = self.progression)
         return 'Circle( {id} ) = {{ {begin}, {center}, {end} }}; {t}'.format( id = self.id,
                                                                               center = self.center,
                                                                               begin = self.begin,
