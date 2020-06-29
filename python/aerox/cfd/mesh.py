@@ -48,11 +48,11 @@ def aerofoil_geometry(aerofoil, config):
     :param config: meshing config, see default_config() for details.
     :return: list of gmsh statements defining mesh geometry.
     """
-    top = _half_aerofoil([aerofoil.leading_edge] + aerofoil.top + [aerofoil.trailing_edge],
+    top = _half_aerofoil([aerofoil.leading_edge] + aerofoil.top,
                           config)
 
-    bottom = _half_aerofoil([aerofoil.trailing_edge] + aerofoil.bottom + [aerofoil.leading_edge],
-                             config)
+    bottom = _half_aerofoil(aerofoil.bottom + [aerofoil.leading_edge],
+                            config)
 
     leading_edge = _leading_edge(top, bottom, config)
 
@@ -269,7 +269,7 @@ def _trailing_edge(top, bottom, config):
                 'curves': {'all': [top_line, right_line, bottom_line]},
                 'loops': {'all': [loop]},
                 'surfaces': {'all': [surface]}}
-
+    
     te_line = Line(top['points']['aerofoil'][-1],
                    bottom['points']['aerofoil'][0],
                    transfinite = 2)

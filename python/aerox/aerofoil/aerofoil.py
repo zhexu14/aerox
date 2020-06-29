@@ -35,10 +35,10 @@ class Aerofoil:
 
         bottom.reverse()
         self.coordinates = top + bottom[1: -1]
-        self.top = top[1: -1]
-        self.bottom = bottom[1: -1]
+        self.top = top[1:]
+        self.bottom = bottom[:-1]
         self.leading_edge = top[0]
-        self.trailing_edge = top[-1]
+        self.trailing_edge = (top[-1][0], 0.5*(bottom[-1][1] + top[-1][1]))
 
     def plot(self):
         """
