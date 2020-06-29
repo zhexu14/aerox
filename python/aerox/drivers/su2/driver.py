@@ -52,6 +52,8 @@ def run(config, verbose = False):
         with open('history.dat', 'r') as fd:
             coefficients.append(_load_history(fd, config))
 
+        os.rename('history.dat', 'history_{}.dat'.format(alpha))
+
         if verbose:
             sys.stderr.write('{},{},{},{}'.format(alpha,
                                                   coefficients[-1]['lift'],
