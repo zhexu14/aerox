@@ -2,6 +2,7 @@ import numpy as np
 import os
 import shlex
 import subprocess
+import sys
 
 from aerox.drivers.su2.config import Config
 
@@ -22,7 +23,13 @@ def default_config():
     return config
 
 
-def run(config):
+def run(config, verbose = False):
+    """
+    Run SU2
+    :param config: run config, see default_config() for details.
+    :param verbose: if True, produce verbose output.
+    :return: list of dicts showing lift, drag and pitching_moment coefficients at each configured alpha.
+    """
     command = 'SU2_CFD'
     if config['path'] is not None:
         command = config['path']
@@ -31,6 +38,7 @@ def run(config):
     coefficients = []
     for alpha in config['alphas']:
         su2_config = Config()
+        su2_config.update(config['su2'])
         su2_config['AOA'] = alpha
         with open(config_file, 'w') as fd:
             su2_config.write(fd)
@@ -38,12 +46,17 @@ def run(config):
                                  stdin = subprocess.PIPE,
                                  stdout = subprocess.PIPE,
                                  stderr = subprocess.PIPE)
-        if not os.path.exists('history.dat') or result.return_code != 0:
+        if not os.path.exists('history.dat') or result.returncode != 0:
             raise ValueError('SU2_CFD failed with\n{}\n{}'.format(result.stdout, result.stderr))
 
         with open('history.dat', 'r') as fd:
-            coefficients.append(_load_history(fd))
+            coefficients.append(_load_history(fd, config))
 
+        if verbose:
+            sys.stderr.write('{},{},{},{}'.format(alpha,
+                                                  coefficients[-1]['lift'],
+                                                  coefficients[-1]['drag'],
+                                                  coefficients[-1]['pitching_moment']))
     return coefficients
 
 
