@@ -17,4 +17,5 @@ sudo apt-get install gfortran
 # Installation
 ```bash
 sudo pip install -r python/requirements.txt
+( cd python ; sudo python setup.py install )
 ```
