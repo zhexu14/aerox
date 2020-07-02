@@ -1,3 +1,4 @@
+import copy
 import numpy as np
 
 from aerox.drivers.gmsh.geometry import Circle
@@ -137,6 +138,24 @@ def _half_aerofoil(coordinates, config):
     :param config: config as dict.
     :return: block data structure representing half an aerofoil.
     """
+
+    coordinates = copy.deepcopy(coordinates)
+    reversed = False
+    if coordinates[0][0] > coordinates[1][0]:
+        coordinates.reverse()
+        reversed = True
+    i = 1
+    while i < len(coordinates):
+        previous_index = i - 1
+        first = np.array([coordinates[previous_index][0], coordinates[previous_index][1], 0])
+        second = np.array([coordinates[i][0], coordinates[i][1], 0])
+        if first[0] > 0.7 and np.abs(second[0] - first[0]) < 1e-2:
+                coordinates = coordinates[0: i-1] + coordinates[i:]
+        else:
+            i += 1
+    if reversed:
+        coordinates.reverse()
+
     aerofoil_points = []
     boundary_points = []
 
@@ -148,10 +167,25 @@ def _half_aerofoil(coordinates, config):
         boundary_point = midpoint + \
                          (config['boundary_layer']['thickness'] / np.linalg.norm(second - first)) \
                          * np.cross(second - first, [0, 0, -1])
-        if boundary_point[0] > 0.7 and boundary_point[0] < midpoint[0]: #  hack to handle reflexed aerofoils
-            boundary_point[0] = midpoint[0]
         aerofoil_points.append(Point(tuple(midpoint)))
         boundary_points.append(Point(tuple(boundary_point)))
+
+    #  go through boundary points to make sure x values are in ascending/descending order
+    if aerofoil_points[1].coordinates[0] > aerofoil_points[0].coordinates[0]:
+        indices = list(range(len(boundary_points)))
+    else:
+        indices = list(range(len(boundary_points) - 1, -1, -1))
+
+    for i in range(1,len(indices)):
+        current_index = indices[i]
+        previous_index = indices[i-1]
+        if boundary_points[current_index].coordinates[0] < boundary_points[previous_index].coordinates[0]:
+            aerofoil_difference = aerofoil_points[current_index].coordinates[0] \
+                                  - aerofoil_points[previous_index].coordinates[0]
+            boundary_points[current_index].coordinates = ( boundary_points[previous_index].coordinates[0] \
+                                                           + aerofoil_difference,
+                                                           boundary_points[previous_index].coordinates[1],
+                                                           0 )
 
     aerofoil_lines = []
     boundary_lines = []
