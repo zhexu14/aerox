@@ -118,7 +118,7 @@ def _write(config, ostream = sys.stdout):
 
     if config['lift_coefficient'] is not None:
         if config['camber']['type'] not in ('3', '3R', '6', '6A'):
-            raise ValueError('lift_coefficient is set for camber line type {}.' + \
+            raise ValueError('lift_coefficient is set for camber line type {}.'.format(config['camber']['type']) + \
                              'Expected one of 3, 3R, 6 or 6A'.format(config['camber']['type']))
         output += 'cl={},\n'.format(config['lift_coefficient'])
 
@@ -161,9 +161,9 @@ def _six_digit(name):
     config = default_config()
     config['thickness']['type'] = s[0]
     config['thickness']['max_fraction'] = float(s[1][1:3]) * 0.01
-    config['lift_coefficient'] = float(s[1][0]) * 0.1
     if s[1][0] == '0':
         config['camber']['type'] = '0'
     else:
         config['camber']['type'] = '6'
+        config['lift_coefficient'] = float(s[1][0]) * 0.1
     return config
