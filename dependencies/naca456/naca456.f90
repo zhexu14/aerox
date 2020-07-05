@@ -270,6 +270,9 @@ USE NACAauxilary
     CASE('4')
       WRITE(DBG,*) "Four-digit profile"
       CALL Thickness4(toc, x,yt,ytp)
+    CASE('4S', '4s')
+      WRITE(DBG,*) "Four-digit profile"
+      CALL Thickness4sharpTE(toc, x,yt,ytp)
     CASE('4M','4m')
       WRITE(DBG,*) "Four-digit-modified profile", leIndex, xmaxt
       CALL Thickness4M(toc,leIndex,xmaxt, x,yt,ytp)
