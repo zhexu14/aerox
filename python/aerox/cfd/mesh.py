@@ -20,18 +20,21 @@ def default_config():
     - far_field/discretisation: grid size at far field
 
     Boundary layer
-    - boundary_layer/thickness: boundary layer thickness.
-    - boundary_layer/layers, discretisation: the layers and discretisation parameters define the regular discretisation
-                                             of the boundary layer along the axes normal and tangential to the aerofoil
-                                             surface respectively. The below example has layers = 3 and
-                                             discretisation = 7.
-                                              _ _ _ _ _ _
-                                             |_|_|_|_|_|_| boundary layer
-                                             |_|_|_|_|_|_|
-                                             |_|_|_|_|_|_|
-                                             Segment of aerofoil surface
-    - boundary_layer/progression: progression in the thickness of the layers. 1 is uniform thickness, >1 means layers
-                                  become thicker the farther away they are from the aerofoil.
+    - grid/regular/thickness: thickness of C-type grid, distance from airfoil.
+    - grid/regular/layers: the number of layers of the grid in the C-grid. In the example grid below,
+                           there are 3 layers.
+                              _ _ _ _ _ _
+                             |_|_|_|_|_|_| C-grid
+                             |_|_|_|_|_|_|
+                             |_|_|_|_|_|_|
+                             Segment of aerofoil surface
+    - grid/regular/width: maximum width of cells before the trailing edge.
+    - grid/regular/wake: average width of cells after the trailing edge.
+    - grid/regular/progression/vertical: progression in the thickness of the layers. 1 is uniform thickness, >1 means
+                                         layers become thicker the farther away they are from the aerofoil.
+    - grid/regular/progression/wake: progression in the thickness of the vertical gridding in the wake.
+                                     1 is uniform thickness, >1 means grid become thicker the farther away they are from
+                                     the trailing edge.
     - boundary_layer/leading_edge_discretisation: the number of regular radial cells to use when meshing along the
                                                   leading edge surface.
     - boundary_layer/trailing_edge_discretisation: the number of regular cells to model the wake with.
@@ -39,12 +42,11 @@ def default_config():
     """
     return {'far_field': {'size': 10,
                           'discretisation': 0.5},
-            'boundary_layer': {'thickness': 9,
-                               'layers': 80,
-                               'progression': 1.1,
-                               'leading_edge_discretisation': 4,
-                               'trailing_edge_discretisation': 100,
-                               'discretisation': 2}}
+            'grid': {'regular': {'width': 0.1,
+                                 'wake': 0.15,
+                                 'layers': 80,
+                                 'thickness': 9,
+                                 'progression': {'vertical': 1.1, 'wake': 1.03}}}}
 
 
 def aerofoil_geometry(aerofoil, config):
@@ -149,7 +151,7 @@ def _half_aerofoil(coordinates, config):
         previous_index = i - 1
         first = np.array([coordinates[previous_index][0], coordinates[previous_index][1], 0])
         second = np.array([coordinates[i][0], coordinates[i][1], 0])
-        if first[0] > 0.7 and np.abs(second[0] - first[0]) < 1e-2:
+        if first[0] > 0.7 and np.abs(second[0] - first[0]) < 1e-3:
                 coordinates = coordinates[0: i-1] + coordinates[i:]
         else:
             i += 1
@@ -163,9 +165,16 @@ def _half_aerofoil(coordinates, config):
     for i in range(1, len(coordinates)):
         first = np.array([coordinates[i - 1][0], coordinates[i - 1][1], 0])
         second = np.array([coordinates[i][0], coordinates[i][1], 0])
-        midpoint = first + 0.5 * (second - first)
+
+        #  normally use midpoint, but on trailing edge, use close to the aft point
+        ratio = 0.5
+        if not reversed and i == len(coordinates)-1:
+            ratio = 0.95
+        if reversed and i == 1:
+            ratio = 0.05
+        midpoint = first + ratio * (second - first)
         boundary_point = midpoint + \
-                         (config['boundary_layer']['thickness'] / np.linalg.norm(second - first)) \
+                         (config['grid']['regular']['thickness'] / np.linalg.norm(second - first)) \
                          * np.cross(second - first, [0, 0, -1])
         aerofoil_points.append(Point(tuple(midpoint)))
         boundary_points.append(Point(tuple(boundary_point)))
@@ -191,21 +200,26 @@ def _half_aerofoil(coordinates, config):
     boundary_lines = []
     vertical_lines = [Line(aerofoil_points[0],
                            boundary_points[0],
-                           transfinite = config['boundary_layer']['layers'],
-                           progression = config['boundary_layer']['progression'])]
+                           transfinite = config['grid']['regular']['layers'],
+                           progression = config['grid']['regular']['progression']['vertical'])]
     loops = []
     surfaces = []
     for i in range(1, len(aerofoil_points)):
+        length = np.linalg.norm(np.array(boundary_points[i-1].coordinates)
+                                - np.array(boundary_points[i].coordinates))
+        num_transfinite = int(length / config['grid']['regular']['width']) + 1
+        if num_transfinite < 2:
+            num_transfinite = 2
         aerofoil_line = Line(aerofoil_points[i-1],
                              aerofoil_points[i],
-                             transfinite = config['boundary_layer']['discretisation'],)
+                             transfinite = num_transfinite)
         boundary_line = Line(boundary_points[i],
                              boundary_points[i - 1],
-                             transfinite = config['boundary_layer']['discretisation'])
+                             transfinite = num_transfinite)
         vertical_line = Line(aerofoil_points[i],
                              boundary_points[i],
-                             transfinite = config['boundary_layer']['layers'],
-                             progression = config['boundary_layer']['progression'])
+                             transfinite = config['grid']['regular']['layers'],
+                             progression = config['grid']['regular']['progression']['vertical'])
         aerofoil_lines.append(aerofoil_line)
         boundary_lines.append(boundary_line)
         vertical_lines.append(vertical_line)
@@ -246,13 +260,18 @@ def _leading_edge(top, bottom, config):
 
     center_point = circle_center(top['points']['aerofoil'], bottom['points']['aerofoil'])
 
+    num_transfinite = int(np.linalg.norm(np.array(top['points']['boundary_layer'][0].coordinates)
+                                         - np.array(bottom['points']['boundary_layer'][-1].coordinates))
+                          / config['grid']['regular']['width'])
+
     inner = Line(begin = top['points']['aerofoil'][0],
                  end = bottom['points']['aerofoil'][-1],
-                 transfinite = config['boundary_layer']['leading_edge_discretisation'])
+                 transfinite = num_transfinite)
+
     outer = Circle(begin = top['points']['boundary_layer'][0].id,
                    center = center_point.id,
                    end = bottom['points']['boundary_layer'][-1].id,
-                   transfinite = config['boundary_layer']['leading_edge_discretisation'])
+                   transfinite = num_transfinite)
     loop = Loop([inner.id,
                  bottom['curves']['normals'][-1].id,
                  - outer.id,
@@ -275,13 +294,17 @@ def _trailing_edge(top, bottom, config):
     :return: block data structure representing the trailing edge.
     """
 
-    def rectangle(top_left, bottom_left, left_line, vertical_discretisation, horizontal_discretisation):
+    def rectangle(top_left,
+                  bottom_left,
+                  left_line,
+                  horizontal_discretisation,
+                  wake_progression = 1):
         """
         :param top_left: top left point of rectangle (existing point)
         :param bottom_left: bottom left point of rectangle (existing point)
         :param left_line: left line of rectangle (existing line)
-        :param vertical_discretisation: vertical discretisation, should match the discretisation of left_line.
         :param horizontal_discretisation: horizontal discretisation.
+        :param wake_progression: progression on horizontal line from trailing edge aft-wards.
         :return: block data structure representing a rectangle in the trailing edge wake.
         """
         top_right = Point((config['far_field']['size'] - 0.5,
@@ -291,21 +314,29 @@ def _trailing_edge(top, bottom, config):
                               bottom_left.coordinates[1],
                               0))
 
+        transfinite_num = int((config['far_field']['size'] - 0.5
+                               - bottom_left.coordinates[0])/horizontal_discretisation)
+
+        if transfinite_num < 2:
+            transfinite_num = 2
+
         top_line = Line(top_left,
                         top_right,
-                        transfinite = horizontal_discretisation)
-        bottom_line = Line(bottom_right,
-                           bottom_left,
-                           transfinite = horizontal_discretisation)
+                        transfinite = transfinite_num,
+                        progression = wake_progression)
+        bottom_line = Line(bottom_left,
+                           bottom_right,
+                           transfinite = transfinite_num,
+                           progression = wake_progression)
         right_line = Line(bottom_right,
                           top_right,
-                          transfinite = vertical_discretisation,
-                          progression = config['boundary_layer']['progression'])
+                          transfinite = left_line.transfinite,
+                          progression = left_line.progression)
 
         loop = Loop([left_line.id,
                      top_line.id,
                      -right_line.id,
-                     bottom_line.id])
+                     -bottom_line.id])
 
         surface = Surface([loop.id], transfinite = True)
 
@@ -321,23 +352,22 @@ def _trailing_edge(top, bottom, config):
     top_rectangle = rectangle(top_left = top['points']['boundary_layer'][-1],
                               bottom_left = top['points']['aerofoil'][-1],
                               left_line = top['curves']['normals'][-1],
-                              vertical_discretisation = config['boundary_layer']['layers'],
-                              horizontal_discretisation = config['boundary_layer']['trailing_edge_discretisation'])
+                              horizontal_discretisation = config['grid']['regular']['wake'],
+                              wake_progression = config['grid']['regular']['progression']['wake'])
 
     bottom_rectangle = rectangle(top_left = bottom['points']['boundary_layer'][0],
                                  bottom_left = bottom['points']['aerofoil'][0],
                                  left_line = bottom['curves']['normals'][0],
-                                 vertical_discretisation = config['boundary_layer']['layers'],
-                                 horizontal_discretisation = config['boundary_layer']['trailing_edge_discretisation'])
-
+                                 horizontal_discretisation = config['grid']['regular']['wake'],
+                                 wake_progression = config['grid']['regular']['progression']['wake'])
 
     center_right_line = Line(top_rectangle['points']['all'][1],
                              bottom_rectangle['points']['all'][1],
                              transfinite = 2)
     center_loop = Loop([te_line.id,
-                        top_rectangle['curves']['all'][2].id,
+                        - top_rectangle['curves']['all'][2].id,
                         - center_right_line.id,
-                        - bottom_rectangle['curves']['all'][2].id])
+                        bottom_rectangle['curves']['all'][2].id])
     center_surface = Surface([center_loop.id], transfinite = True)
 
     r = top_rectangle
