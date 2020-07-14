@@ -1,5 +1,8 @@
+import copy
 import matplotlib.pyplot as plt
 import numpy as np
+import sys
+import xfoil
 
 
 class Aerofoil:
@@ -7,9 +10,9 @@ class Aerofoil:
     Representation of an aerofoil geometry.
     """
     def __init__(self):
-        self.coordinates = []
-        self.top = []
-        self.bottom = []
+        self.coordinates = [] #  coordinates from leading edge aft, wrapping around trailing edge back to the leading edge
+        self.top = [] #  top half of aerofoil from leading edge to trailing edge
+        self.bottom = [] #  bottom half of aerofoil from trailing edge to leading edge
         self.leading_edge = None
         self.trailing_edge = None
 
@@ -55,3 +58,32 @@ class Aerofoil:
         """
         c = np.array(self.coordinates)
         plt.plot(c[:, 0], c[:, 1])
+
+    def to_xfoil(self, ostream = sys.stdout):
+        """
+        Writes aerofoil to x-foil plain file format
+        :return: None
+        """
+        top_reversed = copy.deepcopy(self.top)
+        top_reversed.reverse()
+        for i in range(len(top_reversed)):
+            ostream.write('{} {}\n'.format(top_reversed[i][0], top_reversed[i][1]))
+
+        bottom_reversed = copy.deepcopy(self.bottom)
+        bottom_reversed.reverse()
+        for i in range(1, len(bottom_reversed)):
+            ostream.write('{} {}\n'.format(bottom_reversed[i][0], bottom_reversed[i][1]))
+
+    def to_xfoil_airfoil(self):
+        """
+        :return: xfoil.xfoil.Airfoil object
+        """
+        top_reversed = copy.deepcopy(self.top)
+        top_reversed.reverse()
+
+        bottom_reversed = copy.deepcopy(self.bottom)
+        bottom_reversed.reverse()
+
+        coordinates = np.array(top_reversed + bottom_reversed)
+        airfoil = xfoil.xfoil.Airfoil(coordinates[:,0], coordinates[:,1])
+        return airfoil
