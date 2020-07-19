@@ -11,14 +11,17 @@ def default_config():
     """
     - path: path to SU2_CFD executable. If none, use SU2_CFD i.e. assume executable is in PATH
     - alphas: list of alphas to evaluate
-    - skip_iterations: ignore these number of iterations at the beginning for initialisation
+    - airspeed: airspeed to calculate at, m/s
+    - window_iterations: average this many iterations from the end of the history output to calculate aerodynamic
+                         moments
     - su2/*: override SU2 config
     :return: default config as dict
     """
     config = {}
     config['path'] = None
     config['alphas'] = []
-    config['skip_iterations'] = 100
+    config['airspeed'] = 50.0
+    config['window_iterations'] = 1
     config['su2'] = {}
     return config
 
@@ -39,7 +42,9 @@ def run(config, verbose = False):
     for alpha in config['alphas']:
         su2_config = Config()
         su2_config.update(config['su2'])
-        su2_config['AOA'] = alpha
+        su2_config['INC_VELOCITY_INIT'] = str(tuple([float(config['airspeed']) * np.cos(alpha * np.pi / 180.0),
+                                                     float(config['airspeed']) * np.sin(alpha * np.pi / 180.0),
+                                                     0.0]))
         with open(config_file, 'w') as fd:
             su2_config.write(fd)
         result = subprocess.run( shlex.split('{} {}'.format(command, config_file)),
@@ -88,9 +93,7 @@ def _load_history(file, config):
         data.append(tuple(line.split(',')))
     data = np.array(data, dtype = dtype)
     data = data[np.where(data['Inner_Iter'] > 0)]
-    if len(data) < config['skip_iterations']:
-        raise ValueError('CFD simulation stopped after {} iterations'.format(len(data)))
-    data = data[np.where(data['Time_Iter'] > config['skip_iterations'])]
+    data = data[-config['window_iterations']:]
     return {'drag': np.mean(data['CD']),
             'lift': np.mean(data['CL']),
             'pitching_moment': np.mean(data['CMz'])}
