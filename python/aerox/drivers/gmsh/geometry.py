@@ -2,6 +2,8 @@
 This module implements classes representing gmsh primitives
 """
 
+import numpy as np
+
 
 class Point:
     """
@@ -49,9 +51,9 @@ class Line(Curve):
         self.begin = begin
         self.end = end
         self.transfinite = transfinite
-        self.progression =  progression
+        self.progression = progression
 
-    def __str__( self ):
+    def __str__(self):
         transfinite_statement = ''
         if self.transfinite is not None:
             transfinite_statement = 'Transfinite Line {{ {id} }} = {n} Using Progression {p};'.format(id = self.id,
@@ -61,6 +63,36 @@ class Line(Curve):
                                                                             begin = self.begin.id,
                                                                             end = self.end.id,
                                                                             transfinite = transfinite_statement )
+
+    def progression_from_width(self, initial_width):
+        """
+        Sets progression based on a specified initial width
+        :param initial_width: width of first (smallest) element
+        :return: None
+        """
+        if self.transfinite is None:
+            raise ValueError('Cannot set progression on non-transfinite line')
+        if self.transfinite == 2:  # if transfinite is 2, there is no progression and so set a dummy value
+            self.progression = 1
+        l = np.linalg.norm(np.array(self.begin.coordinates) - np.array(self.end.coordinates))  # line length
+        p = [0] * (self.transfinite + 1)
+        p[0] = 1
+        p[-2] = -l / initial_width
+        p[-1] = -l / initial_width - 1.0
+        r = np.roots(p)
+        self.progression = r[-2].real
+
+    def transfinite_from_grid_size(self, grid_size):
+        """
+        Sets transfinite value to achieve specified grid size
+        :param grid_size: desired size of grid as float
+        :return: None
+        """
+        l = np.linalg.norm(np.array(self.begin.coordinates) - np.array(self.end.coordinates))  # line length
+        t = int(l / grid_size)
+        if t < 2:
+            t = 2
+        self.transfinite = t
 
 
 class Circle( Curve ):
