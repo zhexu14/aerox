@@ -80,7 +80,11 @@ class Line(Curve):
         p[-2] = -l / initial_width
         p[-1] = -l / initial_width - 1.0
         r = np.roots(p)
-        self.progression = r[-2].real
+        for root in r:
+            if not np.iscomplex( root ) and np.abs( root.real - 1.0 ) > 1e-5:
+                self.progression = root.real
+                return
+        self.progression = 1.0
 
     def transfinite_from_grid_size(self, grid_size):
         """
