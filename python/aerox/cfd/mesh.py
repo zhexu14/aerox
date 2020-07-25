@@ -35,8 +35,7 @@ def default_config():
                                                      increase in thickness.
     :return: default config as dict.
     """
-    return {'far_field': {'discretisation': 0.5},
-            'grid': {'regular': {'width': 0.05,
+    return {'grid': {'regular': {'width': 0.05,
                                  'wake': {'width': 0.1, 'progression': None},
                                  'layers': 50,
                                  'thickness': 5,
@@ -60,14 +59,6 @@ def aerofoil_geometry(aerofoil, config):
 
     trailing_edge = _trailing_edge(top, bottom, config)
 
-    far_field = _far_field(config)
-
-    far_field_surface = Surface([surface.id for surface in top['loops']['all']
-                                 + bottom['loops']['all']
-                                 + leading_edge['loops']['all']
-                                 + trailing_edge['loops']['all']]
-                                 + [far_field['loops']['all'][0].id])
-
     # physical objects
     aerofoil_curve = PhysicalCurve('aerofoil',
                                     [line.id for line in top['curves']['aerofoil']]
@@ -75,20 +66,25 @@ def aerofoil_geometry(aerofoil, config):
                                     + [line.id for line in bottom['curves']['aerofoil']]
                                     + [leading_edge['curves']['inner_circle'][0].id])
     far_field_curve = PhysicalCurve('far_field',
-                                    [line.id for line in far_field['curves']['all']])
+                                    [line.id for line in top['curves']['boundary_layer']
+                                                         + [ trailing_edge['curves']['all'][0]]
+                                                         + [trailing_edge['curves']['all'][1]]
+                                                         + [trailing_edge['curves']['all'][-1]]
+                                                         + [trailing_edge['curves']['all'][4]]
+                                                         + [trailing_edge['curves']['all'][3]]
+                                                         + bottom['curves']['boundary_layer']
+                                                         + leading_edge['curves']['outer_circle']])
     physical_surface = PhysicalSurface('dummy',
                                        [surface.id for surface in top['surfaces']['all']
                                                                     + bottom['surfaces']['all']
                                                                     + leading_edge['surfaces']['all']
-                                                                    + trailing_edge['surfaces']['all']]
-                                       + [far_field_surface.id])
+                                                                    + trailing_edge['surfaces']['all']])
 
     return _serialise(top) \
            + _serialise(bottom) \
            + _serialise(leading_edge) \
            + _serialise(trailing_edge) \
-           + _serialise(far_field) \
-           + [str(far_field_surface), str(aerofoil_curve), str(far_field_curve), str(physical_surface)]
+           + [str(aerofoil_curve), str(far_field_curve), str(physical_surface)]
 
 """
 The implementation relies on a block data structure to represent parts of the geometry.
@@ -385,48 +381,3 @@ def _trailing_edge(top, bottom, config):
     r['surfaces']['all'] += [center_surface]
 
     return r
-
-
-def _far_field(config):
-    """
-    Meshes far field
-    :param config: config as dict. See default_config() for details.
-    :return: block data structure representing far field.
-    """
-    def _points(config):
-        v = config['grid']['regular']['thickness']
-        return [Point((-v - 0.5, -v - 0.5, 0), config['far_field']['discretisation']),
-                Point((-v - 0.5, v + 0.5, 0), config['far_field']['discretisation']),
-                Point((2 * v + 0.5, v + 0.5, 0), config['far_field']['discretisation']),
-                Point((2 * v + 0.5, -v - 0.5, 0), config['far_field']['discretisation'])]
-
-    def _lines(points, closed = True, transfinite = None):
-        """
-        :param points: ordered list of Point objects forming a closed loop
-        :param closed: if True, close a loop
-        :return: array of Line objects that draw the closed loop
-        """
-        lines = []
-        for i in range(1, len(points)):
-            lines.append(Line(points[i - 1], points[i], transfinite))
-        if closed:
-            lines.append(Line(points[-1], points[0], transfinite))
-        return lines
-
-    def _loop(lines):
-        """
-        :param lines: list of Line objects that forms the loop
-        :return: Loop object
-        """
-        elements = []
-        for line in lines:
-            elements.append(line.id)
-        return Loop(elements)
-
-    points = _points(config)
-    lines = _lines(points)
-    loop = _loop(lines)
-
-    return {'points': {'all': points},
-            'curves': {'all': lines},
-            'loops': {'all': [loop]}}
