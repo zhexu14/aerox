@@ -96,4 +96,4 @@ def _load_history(file, config):
     data = data[-config['window_iterations']:]
     return {'drag': np.mean(data['CD']),
             'lift': np.mean(data['CL']),
-            'pitching_moment': np.mean(data['CMz'])}
+            'pitching_moment': -np.mean(data['CMz'])}  # negate pitching moment due to sign conventions
