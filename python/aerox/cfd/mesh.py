@@ -15,11 +15,9 @@ def default_config():
     All dimensions are in arbitrary units. Typically the chord length is 1 unit.
 
     Far field
-    - far_field/size: half-dimensions of the far field. The far field is a square at +/- this size from the leading
-                      edge of the aerofoil.
     - far_field/discretisation: grid size at far field
 
-    Boundary layer
+    Grid around aerofoil
     - grid/regular/thickness: thickness of C-type grid, distance from airfoil.
     - grid/regular/layers: the number of layers of the grid in the C-grid. In the example grid below,
                            there are 3 layers.
@@ -35,13 +33,9 @@ def default_config():
                                      the trailing edge. Set to None to automatically calculate this value.
     - grid/regular/boundary_layer/initial_thickness: thickness of the cell immediately adjacent to aerofoil. Cells will
                                                      increase in thickness.
-    - boundary_layer/leading_edge_discretisation: the number of regular radial cells to use when meshing along the
-                                                  leading edge surface.
-    - boundary_layer/trailing_edge_discretisation: the number of regular cells to model the wake with.
     :return: default config as dict.
     """
-    return {'far_field': {'size': 6,
-                          'discretisation': 0.5},
+    return {'far_field': {'discretisation': 0.5},
             'grid': {'regular': {'width': 0.05,
                                  'wake': {'width': 0.1, 'progression': None},
                                  'layers': 50,
@@ -309,15 +303,15 @@ def _trailing_edge(top, bottom, config):
         :param wake_progression: progression on horizontal line from trailing edge aft-wards.
         :return: block data structure representing a rectangle in the trailing edge wake.
         """
-        top_right = Point((config['far_field']['size'] - 0.5,
+        x_dim = 2 * config['grid']['regular']['thickness']
+        top_right = Point((x_dim,
                            top_left.coordinates[1],
                            0))
-        bottom_right = Point((config['far_field']['size'] - 0.5,
+        bottom_right = Point((x_dim,
                               bottom_left.coordinates[1],
                               0))
 
-        transfinite_num = int((config['far_field']['size'] - 0.5
-                               - bottom_left.coordinates[0])/horizontal_discretisation)
+        transfinite_num = int((x_dim - bottom_left.coordinates[0]) / horizontal_discretisation)
 
         if transfinite_num < 2:
             transfinite_num = 2
@@ -400,11 +394,11 @@ def _far_field(config):
     :return: block data structure representing far field.
     """
     def _points(config):
-        v = config['far_field']['size']
-        return [Point((-v, -v, 0), config['far_field']['discretisation']),
-                Point((-v, v, 0), config['far_field']['discretisation']),
-                Point((v, v, 0), config['far_field']['discretisation']),
-                Point((v, -v, 0), config['far_field']['discretisation'])]
+        v = config['grid']['regular']['thickness']
+        return [Point((-v - 0.5, -v - 0.5, 0), config['far_field']['discretisation']),
+                Point((-v - 0.5, v + 0.5, 0), config['far_field']['discretisation']),
+                Point((2 * v + 0.5, v + 0.5, 0), config['far_field']['discretisation']),
+                Point((2 * v + 0.5, -v - 0.5, 0), config['far_field']['discretisation'])]
 
     def _lines(points, closed = True, transfinite = None):
         """
